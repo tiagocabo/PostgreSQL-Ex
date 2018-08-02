@@ -554,7 +554,412 @@ SELECT
 FROM
   orders
 where
-  shippedDate > requiredDate
+  date(shippedDate) >= date(requiredDate);
+
+------------ Problem 42 ----------------------------------- Late orders which employee
+
+SELECT
+
+  orders.employeeID,
+  lastName,
+  COUNT(*) AS employeelate
+FROM
+  orders
+  JOIN employee
+  ON orders.employeeID = employee.employeeID
+where
+  date(shippedDate) >= date(requiredDate)
+
+GROUP BY orders.employeeID, lastName
+
+ORDER BY employeelate desc , lastName asc
 ;
+
+
+---------- Problem 43 ----------------------------
+with lateorders as (
+SELECT
+
+  orders.employeeID,
+  lastName,
+  COUNT(*) AS employeelate
+FROM
+  orders
+  JOIN employee
+  ON orders.employeeID = employee.employeeID
+where
+  date(shippedDate) > date(requiredDate)
+
+GROUP BY orders.employeeID, lastName
+
+ORDER BY employeelate desc , lastName asc)
+
+
+SELECT orders.employeeID,
+  lastName,
+  COUNT(*) as AllOrders,
+  employeelate
+
+  FROM orders
+    join lateorders
+    ON lateorders.employeeID = orders.employeeID
+
+GROUP BY orders.employeeID, lastName, lateorders.employeeID, employeelate
+order by orders.employeeID;
+
+------------------ Problem 44 --------------------------------------------
+-- In case of a employee doesn't have a late order we must use a left Join to show Null values on the right column
+
+------------------ Problem 45 ----------- ISNULL(MySQL) Statement OR Coalesce (PostGres) Or NVR oracle
+with lateorders as (
+SELECT
+
+  orders.employeeID,
+  lastName,
+  COUNT(*) AS employeelate, 0
+FROM
+  orders
+  JOIN employee
+  ON orders.employeeID = employee.employeeID
+where
+  date(shippedDate) > date(requiredDate)
+
+GROUP BY orders.employeeID, lastName
+
+ORDER BY employeelate desc , lastName asc)
+
+
+SELECT orders.employeeID,
+  lastName,
+  COUNT(*) as AllOrders,
+  COALESCE(employeelate, 0)--- or Case WHEN employeelate isnull then 0
+                          -------------ELSE employee
+                          -------------END
+
+  FROM orders
+    join lateorders
+    ON lateorders.employeeID = orders.employeeID
+
+GROUP BY orders.employeeID, lastName, lateorders.employeeID, employeelate
+order by orders.employeeID;
+
+--------- Problem 46 --------- Percentage, VARIABLES CASTING
+with lateorders as (
+SELECT
+
+  orders.employeeID,
+  lastName,
+  COUNT(*) AS employeelate, 0
+FROM
+  orders
+  JOIN employee
+  ON orders.employeeID = employee.employeeID
+where
+  date(shippedDate) > date(requiredDate)
+
+GROUP BY orders.employeeID, lastName
+
+ORDER BY employeelate desc , lastName asc),
+
+Allorders as (
+SELECT orders.employeeID,
+  lastName,
+  COUNT(*) as AllOrders
+  FROM orders
+    join lateorders
+    ON lateorders.employeeID = orders.employeeID
+
+GROUP BY orders.employeeID, lastName, lateorders.employeeID, employeelate
+order by orders.employeeID)
+
+SELECT
+  Allorders.employeeID,
+  Allorders.lastName,
+  Allorders.AllOrders,
+  employeelate,
+  employeelate::DECIMAL / Allorders.AllOrders::DECIMAL as PERCENTAGE
+  FROM Allorders
+JOIN lateorders
+    ON Allorders.employeeID = lateorders.employeeID
+
+;
+
+---------- Problem 47------------------------------------------------------ round and cast statement
+with lateorders as (
+SELECT
+
+  orders.employeeID,
+  lastName,
+  COUNT(*) AS employeelate, 0
+FROM
+  orders
+  JOIN employee
+  ON orders.employeeID = employee.employeeID
+where
+  date(shippedDate) > date(requiredDate)
+
+GROUP BY orders.employeeID, lastName
+
+ORDER BY employeelate desc , lastName asc),
+
+Allorders as (
+SELECT orders.employeeID,
+  lastName,
+  COUNT(*) as AllOrders
+  FROM orders
+    join lateorders
+    ON lateorders.employeeID = orders.employeeID
+
+GROUP BY orders.employeeID, lastName, lateorders.employeeID, employeelate
+order by orders.employeeID)
+
+SELECT
+  Allorders.employeeID,
+  Allorders.lastName,
+  Allorders.AllOrders,
+  employeelate,
+  round(employeelate::numeric / Allorders.AllOrders::numeric , 2) as PERCENTAGE
+  FROM Allorders
+JOIN lateorders
+    ON Allorders.employeeID = lateorders.employeeID
+
+;
+
+------------- Problem 48 ----------------- Customer grouping
+with highlevelclients as (
+SELECT
+  customers.customerID,
+  customers.companyName,
+  sum(unitPrice * quantity) as total_value
+
+  from customers
+
+ join orders
+
+    ON orders.customerID = orders.customerID
+
+join order_details
+
+    ON orders.orderID = order_details.orderID
+
+WHERE  OrderDate >= '19970101'
+ and OrderDate  < '19980101'
+
+GROUP BY
+   customers.customerID, companyName
+
+ORDER BY total_value DESC)
+
+SELECT
+  customerID,
+  companyName,
+
+  CASE
+    WHEN total_value between 0 and 1000 THEN 'Low'
+    WHEN total_value between 1001 and 5000 THEN 'Medium'
+    WHEN total_value between 50001 and 10000 then 'High'
+    When total_value > 10000 then 'Very High'
+    END AS CustumerGrouping
+
+  FROM highlevelclients
+  order by customerID
+;
+
+-------- Problem 49 ------------------------------------- NotNull Values
+with highlevelclients as (
+SELECT
+  customers.customerID,
+  customers.companyName,
+  sum(unitPrice * quantity) as total_value
+
+  from customers
+
+ join orders
+
+    ON orders.customerID = orders.customerID
+
+join order_details
+
+    ON orders.orderID = order_details.orderID
+
+WHERE  OrderDate >= '19970101'
+ and OrderDate  < '19980101'
+
+GROUP BY
+   customers.customerID, companyName
+
+ORDER BY total_value DESC)
+
+SELECT
+  customerID,
+  companyName,
+
+  CASE
+    WHEN total_value >= 0 and total_value < 1000 THEN 'Low'
+    WHEN total_value >= 1001 and total_value < 5000 THEN 'Medium'
+    WHEN total_value >= 50001 and total_value < 10000 then 'High'
+    When total_value > 10000 then 'Very High'
+    END AS CustumerGrouping
+
+  FROM highlevelclients
+  order by customerID
+;
+-------------- Problem 50 ----------------------
+with highlevelclients as (
+SELECT
+  customers.customerID,
+  customers.companyName,
+  sum(unitPrice * quantity) as total_value
+
+  from customers
+
+ join orders
+
+    ON orders.customerID = orders.customerID
+
+join order_details
+
+    ON orders.orderID = order_details.orderID
+
+WHERE  OrderDate >= '19970101'
+ and OrderDate  < '19980101'
+
+GROUP BY
+   customers.customerID, companyName
+
+ORDER BY total_value DESC),
+
+  custumergroups as (
+SELECT
+  customerID,
+  companyName,
+
+  CASE
+    WHEN total_value >= 0 and total_value < 1000 THEN 'Low'
+    WHEN total_value >= 1001 and total_value < 5000 THEN 'Medium'
+    WHEN total_value >= 50001 and total_value < 10000 then 'High'
+    When total_value > 10000 then 'Very High'
+    END AS CustumerGrouping
+
+  FROM highlevelclients
+  order by customerID)
+
+SELECT
+  CustumerGrouping,
+  count(*) as TotalinGroup,
+  count(*) / (SELECT count(*)
+              from custumergroups) as percentageingroup
+  from
+    custumergroups
+GROUP BY CustumerGrouping
+
+;
+------- Problem 52 ----------------------------------------------- UNION STATMENT
+
+SELECT
+  country
+  FROM
+    customers
+UNION
+  SELECT
+    country
+  FROM employee
+
+ORDER BY  country ASC
+--- USING UNION ALL (does not eliminate duplicates)
+
+SELECT DISTINCT
+  country
+  FROM
+    customers
+UNION ALL
+  SELECT DISTINCT
+    country
+  FROM employee
+
+ORDER BY  country ASC
+
+------------ Problem 53 ------------------------------
+
+with SupplierCountries as (
+  SELECT DISTINCT country from suppliers
+),
+  CustumerCountries as (
+    SELECT distinct country from customers
+  )
+SELECT  SupplierCountries.country as SupplierCoutry,
+        CustumerCountries.country as CustomerCountry
+FROM SupplierCountries
+FULL OUTER JOIN CustumerCountries
+  ON CustumerCountries.country = SupplierCountries.country
+ORDER BY SupplierCoutry ASC;
+
+-------------- Problem 54 ---------------------------------
+with SupplierCountries as (
+  SELECT country,
+    count(*) as TotalSuppliers
+  from suppliers
+group by country),
+
+  CustumerCountries as (
+    SELECT country,
+      count(*) as totalCustumers
+    from customers
+    group by country
+  )
+
+SELECT coalesce(CustumerCountries.country, SupplierCountries.country) as countries,
+  coalesce(TotalSuppliers,0) as totalsuppliers,
+  coalesce(totalCustumers,0) as totalcustomers
+from CustumerCountries
+full join  SupplierCountries
+ON CustumerCountries.country = SupplierCountries.country
+order by countries
+;
+
+----------- Problem 55 ------------------------------------
+with CountruFirstOrder as (
+SELECT distinct
+  shipCountry,
+  min(orderID) as FirstOrder
+from
+  orders
+group by shipCountry
+order by shipCountry asc)
+
+SELECT distinct
+CountruFirstOrder.shipCountry,
+  customerID,
+  orderID,
+  FirstOrder
+FROM
+  CountruFirstOrder
+join orders
+  on FirstOrder = orderID
+group by CountruFirstOrder.shipCountry, customerID, orderID, FirstOrder
+order by CountruFirstOrder.shipCountry asc ;
+
+--------------- Problem 56 --------------------------------------------- self join
+SELECT
+  InitialOrders.customerID,
+  InitialOrders.orderID,
+  date(InitialOrders.orderDate),
+  NextOrders.orderID,
+  date(NextOrders.orderDate),
+  date_part('days',NextOrders.orderDate - InitialOrders.orderDate) as daysbetween
+
+  FROM orders AS InitialOrders
+join orders as NextOrders
+    on InitialOrders.customerID = NextOrders.customerID
+
+  where InitialOrders.orderID < NextOrders.orderID
+        and
+      date_part('days',NextOrders.orderDate - InitialOrders.orderDate) <= 5
+
+order by  InitialOrders.customerID,InitialOrders.orderDate;
+
+---------------- Problem 57 -------------------------------------- Partitions
+
+
 
 
